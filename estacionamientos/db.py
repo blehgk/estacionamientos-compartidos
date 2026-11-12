@@ -63,3 +63,15 @@ def registrar(con, evento: str, ahora: datetime, reserva_id=None, parking_id=Non
          cliente_id, inicio, fin, estado, valor, detalle),
     )
     con.commit()
+
+
+def consultar(con) -> dict[str, list[tuple]]:
+    """Datos de solo lectura que muestran la terminal y la web."""
+    def filas(sql):
+        return [tuple(r) for r in con.execute(sql)]
+    return {
+        "reservas": filas("SELECT id, cliente_id, parking_id, inicio, fin, estado, monto FROM reservas ORDER BY id DESC"),
+        "estacionamientos": filas("SELECT id, propietario_id, tipo, estado FROM estacionamientos ORDER BY id"),
+        "creditos": filas("SELECT id, credito FROM clientes ORDER BY id"),
+        "historial": filas("SELECT ts, evento, reserva_id, parking_id, valor, detalle FROM historial ORDER BY id DESC LIMIT 50"),
+    }

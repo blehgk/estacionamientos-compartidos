@@ -3,3 +3,6 @@ __pycache__/
 *.db
 GOAL_FINAL.md
 docs/superpowers/
+.atl/
+tests/
+docs/guion_demo.md
