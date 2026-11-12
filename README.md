@@ -41,7 +41,9 @@ Los datos se guardan en `estacionamientos.db`, en la carpeta desde la que se eje
 
 | Ruta | Contenido |
 |---|---|
-| `estacionamientos/servicios.py` | Reglas de negocio. No imprime ni lee datos. |
+| `estacionamientos/modelos.py` | Clases del dominio (`Periodo`, `Estacionamiento`, `Reserva`) y sus reglas. |
+| `estacionamientos/repositorio.py` | Clase `Repositorio`: acceso a SQLite. |
+| `estacionamientos/servicios.py` | Clase `Sistema`: las funcionalidades de cada rol. No imprime ni lee datos. |
 | `estacionamientos/db.py` | Esquema SQLite, datos de prueba e historial de operaciones. |
 | `estacionamientos/acciones.py` | Acciones, formularios y vistas compartidos por la terminal y la web. |
 | `estacionamientos/consola.py` | Menus de terminal, generados desde `acciones.py`. |

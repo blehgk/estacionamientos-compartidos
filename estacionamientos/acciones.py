@@ -1,7 +1,8 @@
 """Acciones, formularios y vistas compartidos por la terminal y la web."""
 from datetime import datetime
 
-from . import servicios as s
+from .modelos import ReglaError
+from .servicios import Sistema
 
 NUMERICAS = {"Monto", "Valor"}
 
@@ -31,14 +32,14 @@ def _hora(f):
 
 
 ACCIONES = {
-    "reservar": lambda c, f: f"Reserva {s.reservar(c, _id(f, 'cliente_id'), _fecha(f, 'inicio'), _fecha(f, 'fin'), _hora(f))} creada (pendiente).",
-    "cancelar": lambda c, f: f"Reembolso: {clp(s.cancelar(c, _id(f, 'reserva_id'), _hora(f)))}",
-    "liberar": lambda c, f: s.liberar(c, _id(f, "parking_id"), _hora(f), _id(f, "propietario_id")) or "Estacionamiento liberado.",
-    "bloquear": lambda c, f: f"Reservas afectadas: {s.bloquear(c, _id(f, 'parking_id'), _fecha(f, 'inicio'), _fecha(f, 'fin'), f.get('motivo', '').strip(), _hora(f), _id(f, 'propietario_id'))}",
-    "vuelvo_ahora": lambda c, f: f"Credito acreditado al cliente: {clp(s.vuelvo_ahora(c, _id(f, 'parking_id'), _hora(f), _id(f, 'propietario_id')))}",
-    "asignar": lambda c, f: s.asignar(c, _id(f, "reserva_id"), _id(f, "parking_id"), _hora(f)) or "Reserva confirmada.",
-    "reasignar": lambda c, f: s.reasignar(c, _id(f, "reserva_id"), _id(f, "parking_id"), _hora(f)) or "Reserva reasignada.",
-    "salida": lambda c, f: f"Recargo por sobreestadia: {clp(s.registrar_salida(c, _id(f, 'reserva_id'), _hora(f)))}",
+    "reservar": lambda c, f: f"Reserva {Sistema(c).reservar(_id(f, 'cliente_id'), _fecha(f, 'inicio'), _fecha(f, 'fin'), _hora(f))} creada (pendiente).",
+    "cancelar": lambda c, f: f"Reembolso: {clp(Sistema(c).cancelar(_id(f, 'reserva_id'), _hora(f)))}",
+    "liberar": lambda c, f: Sistema(c).liberar(_id(f, "parking_id"), _hora(f), _id(f, "propietario_id")) or "Estacionamiento liberado.",
+    "bloquear": lambda c, f: f"Reservas afectadas: {Sistema(c).bloquear(_id(f, 'parking_id'), _fecha(f, 'inicio'), _fecha(f, 'fin'), f.get('motivo', '').strip(), _hora(f), _id(f, 'propietario_id'))}",
+    "vuelvo_ahora": lambda c, f: f"Credito acreditado al cliente: {clp(Sistema(c).vuelvo_ahora(_id(f, 'parking_id'), _hora(f), _id(f, 'propietario_id')))}",
+    "asignar": lambda c, f: Sistema(c).asignar(_id(f, "reserva_id"), _id(f, "parking_id"), _hora(f)) or "Reserva confirmada.",
+    "reasignar": lambda c, f: Sistema(c).reasignar(_id(f, "reserva_id"), _id(f, "parking_id"), _hora(f)) or "Reserva reasignada.",
+    "salida": lambda c, f: f"Recargo por sobreestadia: {clp(Sistema(c).registrar_salida(_id(f, 'reserva_id'), _hora(f)))}",
 }
 
 
@@ -47,7 +48,7 @@ def ejecutar(con, accion: str, form: dict) -> str:
         return "No se pudo: accion desconocida."
     try:
         return str(ACCIONES[accion](con, form))
-    except s.ReglaError as e:
+    except ReglaError as e:
         return f"No se pudo: {e}"
     except KeyError as e:
         return f"No se pudo: falta el campo {e}."
