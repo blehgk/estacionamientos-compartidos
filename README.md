@@ -55,7 +55,13 @@ En una reserva pendiente, el estacionamiento aparece como `None` porque todavia 
 |---|---|
 | Propietario | Liberar y bloquear su estacionamiento. «Vuelvo ahora»: reubica al cliente en un comodin y le acredita el tiempo no usado. |
 | Cliente | Reservar, y cancelar con reembolso escalonado. |
-| Administrador | Asignar y reasignar reservas, y registrar la salida con recargo por sobreestadia. |
+| Administrador | Asignar y reasignar reservas, registrar salidas y crear clientes y propietarios. |
+
+### Registrar usuarios desde Administrador
+
+En la terminal, ejecuta `python main.py`, elige **3 Administrador** y luego **4 Crear cliente** o **5 Crear propietario**. Escribe el nombre y anota el ID que muestra la aplicacion. En la version web, ambas opciones aparecen en la pestaña **Administrador**.
+
+SQLite asigna el ID automaticamente. El cliente puede usar su ID para reservar. El alta del propietario solo registra su ficha. Las plazas se administran por separado.
 
 ## Reglas de negocio
 

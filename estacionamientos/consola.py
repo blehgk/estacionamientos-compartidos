@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from .acciones import (CONFIRMAR, FORMS, NOMBRES, VISTAS, creditos_texto, ejecutar,
+from .acciones import (ALTAS_USUARIO, CONFIRMAR, FORMS, NOMBRES, VISTAS, creditos_texto, ejecutar,
                        leer_fecha, leer_id, texto_celda)
 from .db import conectar, consultar, sembrar
 
@@ -76,7 +76,8 @@ def menu(con, rol: str, leer=input) -> None:
             continue
         accion, _, campos = acciones[int(opcion) - 1]
         form = {nombre: pedir_campo(etiqueta, tipo, leer) for nombre, etiqueta, tipo in campos}
-        form["hora"] = pedir_hora(leer)
+        if accion not in ALTAS_USUARIO:
+            form["hora"] = pedir_hora(leer)
         if accion in CONFIRMAR and pedir_opcion(f"{CONFIRMAR[accion]}? (s/n): ", {"s", "n"}, leer) == "n":
             print("Cancelado.")
             continue

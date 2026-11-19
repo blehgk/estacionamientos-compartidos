@@ -3,7 +3,7 @@ from html import escape
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs, quote, urlparse
 
-from .acciones import (CONFIRMAR, FORMS, NOMBRES, NUMERICAS, VISTAS, creditos_texto, ejecutar,
+from .acciones import (ALTAS_USUARIO, CONFIRMAR, FORMS, NOMBRES, NUMERICAS, VISTAS, creditos_texto, ejecutar,
                        texto_celda)
 from .db import conectar, consultar, sembrar
 
@@ -55,9 +55,11 @@ def _form(rol, accion, titulo, campos) -> str:
         f'<label>{et}<input name="{n}" type="{t}" autocomplete="off"{"" if n == "motivo" else " required"}></label>'
         for n, et, t in campos)
     confirmar = f' onsubmit="return confirm(\'{CONFIRMAR[accion]}?\')"' if accion in CONFIRMAR else ""
+    hora = ('<label>Hora de la operacion (opcional)<input name="hora" type="datetime-local" autocomplete="off"></label>'
+            if accion not in ALTAS_USUARIO else "")
     return (f'<form method="post" action="/{rol}/{accion}" aria-labelledby="t-{accion}"{confirmar}>'
             f'<h2 id="t-{accion}">{titulo}</h2>{inputs}'
-            f'<label>Hora de la operacion (opcional)<input name="hora" type="datetime-local" autocomplete="off"></label>'
+            f'{hora}'
             f'<button>{titulo}</button></form>')
 
 
@@ -102,7 +104,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):  # redirige despues de operar: recargar la pagina no repite la operacion
         partes = self.path.strip("/").split("/")
-        rol = partes[0] if partes[0] in FORMS else "cliente"
+        accion = partes[-1]
+        rol = partes[0]
+        if len(partes) != 2 or not any(accion == nombre for nombre, _, _ in FORMS.get(rol, ())):
+            self.send_error(404, "Accion desconocida para este menu")
+            return
         try:
             largo = int(self.headers.get("Content-Length", 0))
         except ValueError:
@@ -112,7 +118,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         form = {k: v[0] for k, v in parse_qs(self.rfile.read(largo).decode("utf-8", "replace")).items()}
         self.send_response(303)
-        self.send_header("Location", f"/{rol}?m={quote(ejecutar(self.con, partes[-1], form))}")
+        self.send_header("Location", f"/{rol}?m={quote(ejecutar(self.con, accion, form))}")
         self.end_headers()
 
     def log_message(self, *args):

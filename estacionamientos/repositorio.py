@@ -20,6 +20,15 @@ class Repositorio:
     def _estacionamiento(fila) -> Estacionamiento:
         return Estacionamiento(fila["id"], fila["propietario_id"], fila["tipo"], fila["estado"])
 
+    def crear_usuario(self, tipo: str, nombre: str) -> int:
+        consultas = {
+            "cliente": "INSERT INTO clientes (nombre) VALUES (?)",
+            "propietario": "INSERT INTO propietarios (nombre) VALUES (?)",
+        }
+        with self.con:
+            fila = self.con.execute(consultas[tipo], (nombre,))
+        return fila.lastrowid
+
     def existe_cliente(self, cliente_id: int) -> bool:
         return self.con.execute("SELECT 1 FROM clientes WHERE id=?", (cliente_id,)).fetchone() is not None
 

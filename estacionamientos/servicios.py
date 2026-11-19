@@ -146,6 +146,12 @@ class Sistema:
         return credito
 
     # administrador
+    def crear_usuario(self, tipo: str, nombre: str) -> int:
+        nombre = nombre.strip()
+        if not nombre.isprintable() or not any(letra.isalpha() for letra in nombre):
+            raise ReglaError("Escribe un nombre valido.")
+        return self.repo.crear_usuario(tipo, nombre)
+
 
     def asignar(self, reserva_id: int, parking_id: int, ahora: datetime) -> None:
         r = self.repo.reserva(reserva_id)

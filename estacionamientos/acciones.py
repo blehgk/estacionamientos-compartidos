@@ -56,6 +56,14 @@ def _hora(f):
     return leer_fecha(t) if t else datetime.now().replace(second=0, microsecond=0)
 
 
+ALTAS_USUARIO = {"crear_cliente": "cliente", "crear_propietario": "propietario"}
+
+
+def _crear_usuario(con, tipo: str, form: dict) -> str:
+    numero = Sistema(con).crear_usuario(tipo, form["nombre"])
+    return f"{tipo.capitalize()} {numero} creado."
+
+
 ACCIONES = {
     "reservar": lambda c, f: f"Reserva {Sistema(c).reservar(_id(f, 'cliente_id'), _fecha(f, 'inicio'), _fecha(f, 'fin'), _hora(f))} creada (pendiente).",
     "cancelar": lambda c, f: f"Reembolso: {clp(Sistema(c).cancelar(_id(f, 'reserva_id'), _hora(f)))}",
@@ -69,9 +77,11 @@ ACCIONES = {
 
 
 def ejecutar(con, accion: str, form: dict) -> str:
-    if accion not in ACCIONES:
-        return "No se pudo: accion desconocida."
     try:
+        if accion in ALTAS_USUARIO:
+            return _crear_usuario(con, ALTAS_USUARIO[accion], form)
+        if accion not in ACCIONES:
+            return "No se pudo: accion desconocida."
         return str(ACCIONES[accion](con, form))
     except ReglaError as e:
         return f"No se pudo: {e}"
@@ -97,6 +107,8 @@ FORMS = {
         ("asignar", "Asignar", [("reserva_id", "Reserva", "number"), ("parking_id", "Estacionamiento", "number")]),
         ("reasignar", "Reasignar", [("reserva_id", "Reserva", "number"), ("parking_id", "Nuevo estacionamiento", "number")]),
         ("salida", "Registrar salida", [("reserva_id", "Reserva", "number")]),
+        ("crear_cliente", "Crear cliente", [("nombre", "Nombre", "text")]),
+        ("crear_propietario", "Crear propietario", [("nombre", "Nombre", "text")]),
     ],
 }
 NOMBRES = {"cliente": "Cliente", "propietario": "Propietario", "admin": "Administrador"}
