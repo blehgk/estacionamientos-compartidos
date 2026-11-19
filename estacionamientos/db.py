@@ -1,4 +1,5 @@
 import sqlite3
+from contextlib import closing
 from datetime import datetime
 
 ESQUEMA = """
@@ -75,3 +76,13 @@ def consultar(con) -> dict[str, list[tuple]]:
         "creditos": filas("SELECT id, credito FROM clientes ORDER BY id"),
         "historial": filas("SELECT ts, evento, reserva_id, parking_id, valor, detalle FROM historial ORDER BY id DESC LIMIT 50"),
     }
+
+
+if __name__ == "__main__":
+    try:
+        with closing(sqlite3.connect("file:estacionamientos.db?mode=ro", uri=True)) as con:
+            con.execute("BEGIN")
+            for linea in con.iterdump():
+                print(linea)
+    except sqlite3.Error as error:
+        raise SystemExit(f"No se pudo leer estacionamientos.db en la carpeta actual: {error}") from error

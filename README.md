@@ -29,6 +29,16 @@ Los datos se guardan en `estacionamientos.db`, en la carpeta desde la que se eje
 
 Cuando ejecutas el proyecto desde el ZIP, usa su carpeta `codigo/`. El archivo `estacionamientos.db` se guarda en la carpeta desde la que iniciaste el programa.
 
+### Mostrar toda la base de datos
+
+Desde la misma carpeta en la que ejecutas la app, usa:
+
+```bash
+python -m estacionamientos.db
+```
+
+Muestra la estructura y todos los registros en formato SQL, incluido el historial completo. Abre el archivo SQLite en modo de solo lectura. Si todavia no existe `estacionamientos.db`, inicia la app una vez para crearlo.
+
 ### Consultar SQLite directamente
 
 Ejecuta este comando desde la carpeta que contiene `estacionamientos.db`. Abre la base en modo de solo lectura y muestra el numero de reserva, cliente, estacionamiento y estado:
