@@ -5,7 +5,7 @@
 |---|---|
 | `estacionamientos/db.py` | Conexion SQLite, esquema, datos de prueba (`sembrar`) y registro del historial (`registrar`). |
 | `estacionamientos/modelos.py` | Clases del dominio: `Periodo`, `Estacionamiento` y `Reserva`, y la excepcion `ReglaError`. Cada entidad aplica las reglas que dependen solo de sus datos (superposicion, reembolso escalonado, recargo por sobreestadia). |
-| `estacionamientos/repositorio.py` | Clase `Repositorio`: unico lugar con consultas SQL. Traduce filas de SQLite a entidades del dominio. |
+| `estacionamientos/repositorio.py` | Clase `Repositorio`: consulta y actualiza entidades del dominio en SQLite. |
 | `estacionamientos/servicios.py` | Clase `Sistema`: las 6 funcionalidades y las reglas que coordinan varias entidades (RN01 a RN05). No usa `input()` ni `print()`; las violaciones lanzan `ReglaError`. |
 | `estacionamientos/acciones.py` | Definicion unica de las acciones, formularios y vistas. La terminal y la web se generan desde aqui, por lo que ofrecen lo mismo y muestran los mismos mensajes y formatos. |
 | `estacionamientos/consola.py` | Menus de terminal generados desde `acciones.py`: pide los datos, confirma la cancelacion y muestra el estado (reservas, estacionamientos, historial y credito). |
@@ -26,17 +26,19 @@
 - **Reasignar:** mueve una reserva a otro estacionamiento (incluye comodines) tras verificar que no haya conflicto.
 - **Liberar:** deja el estacionamiento disponible y quita sus bloqueos vigentes. Solo lo puede usar su propietario.
 - **Bloquear:** solo el propietario del estacionamiento (nunca un comodin); crea un bloqueo; las reservas afectadas se reubican a un comodin libre o, si no hay, se cancelan con reembolso total.
-- **Vuelvo ahora:** bloquea desde el momento actual hasta el fin de la reserva, reubica al cliente y le acredita el tiempo no utilizado.
-- **Registrar salida:** cierra la reserva y cobra el recargo por sobreestadia.
+- **Vuelvo ahora:** bloquea desde el momento actual hasta el fin de la reserva, reubica al cliente y acredita el tiempo no utilizado. Los reembolsos descuentan el credito ya abonado por reubicacion.
+- **Registrar salida:** cierra una reserva activa desde su hora de inicio y calcula el recargo si supera la tolerancia.
+
+**Justificacion de las funcionalidades propias.** "Vuelvo ahora" permite que el propietario recupere su plaza ante un cambio de planes. El credito escalonado compensa al cliente segun la anticipacion de su aviso. El recargo por sobreestadia ayuda a la administracion a gestionar atrasos que afectan la disponibilidad.
 
 ## 3. Reglas de negocio implementadas
 | Regla | Donde |
 |---|---|
-| RN01 Prioridad del propietario | `Sistema.bloquear` y `Sistema.vuelvo_ahora`: el bloqueo siempre se aplica y desplaza al cliente. |
+| RN01 Prioridad del propietario | `Sistema.bloquear` y `Sistema.vuelvo_ahora`: consideran todas las reservas activas, incluidas las reubicadas. |
 | RN02 No superposicion | `Periodo.se_superpone` y `Repositorio.hay_conflicto`: intervalos semiabiertos, una reserva puede empezar justo cuando termina otra. |
 | RN03 Disponibilidad | `Sistema.estacionamientos_compatibles` y `Sistema._apto`: solo `liberado`, no bloqueado y sin conflicto. |
-| RN04 Consistencia de estados | Cada operacion actualiza reserva, credito e historial en conjunto. |
-| RN05 (propia) Reembolso escalonado | `Reserva.reembolso`: 100% hasta 1 h antes del inicio, 50% desde ahi hasta el inicio, 0% despues. |
+| RN04 Consistencia de estados | Las operaciones validan el estado antes de modificar la reserva y registran los cambios relevantes en el historial. |
+| RN05 (propia) Reembolso escalonado | `Reserva.reembolso`: 100% si sigue pendiente o con al menos 1 h de aviso, 50% con menos de 1 h de aviso y 0% desde el inicio en reservas asignadas. |
 | RN05 (propia) Sobreestadia | `Reserva.recargo`: desde el minuto 6 de atraso, $60 por minuto (`60 × (atraso − 5)`). |
 | Duracion y anticipacion | `Sistema.reservar`: 60–120 min; 15 min a 7 dias de anticipacion. Tarifa $30/min. |
 

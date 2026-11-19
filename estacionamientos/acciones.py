@@ -22,13 +22,38 @@ def texto_celda(valor, cabecera: str) -> str:
     return texto
 
 
-def _id(f, k): return int(f[k].strip())
-def _fecha(f, k): return datetime.fromisoformat(f[k].strip())
+def leer_id(texto: str) -> int:
+    texto = texto.strip()
+    if not texto.isascii() or not texto.isdecimal():
+        raise ValueError("El ID debe contener solo digitos.")
+    numero = int(texto)
+    if not 1 <= numero < 2**63:
+        raise ValueError("El ID debe ser un entero positivo dentro del rango de SQLite.")
+    return numero
+
+
+def leer_fecha(texto: str) -> datetime:
+    texto = texto.strip().replace(" ", "T", 1)
+    fecha = datetime.fromisoformat(texto)
+    if fecha.tzinfo is not None or fecha.isoformat(timespec="minutes") != texto:
+        raise ValueError("Usa fecha y hora local con precision de minutos.")
+    return fecha
+
+
+def _id(f, k):
+    try:
+        return leer_id(f[k])
+    except ValueError as error:
+        raise ReglaError("El identificador debe ser un numero entero positivo valido.") from error
+
+
+def _fecha(f, k):
+    return leer_fecha(f[k])
 
 
 def _hora(f):
     t = f.get("hora", "").strip()
-    return datetime.fromisoformat(t) if t else datetime.now().replace(second=0, microsecond=0)
+    return leer_fecha(t) if t else datetime.now().replace(second=0, microsecond=0)
 
 
 ACCIONES = {

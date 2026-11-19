@@ -1,6 +1,7 @@
 from datetime import datetime
 
-from .acciones import CONFIRMAR, FORMS, NOMBRES, VISTAS, creditos_texto, ejecutar, texto_celda
+from .acciones import (CONFIRMAR, FORMS, NOMBRES, VISTAS, creditos_texto, ejecutar,
+                       leer_fecha, leer_id, texto_celda)
 from .db import conectar, consultar, sembrar
 
 
@@ -15,9 +16,9 @@ def pedir_opcion(prompt: str, validas: set[str], leer=input) -> str:
 def pedir_entero(prompt: str, leer=input) -> int:
     while True:
         try:
-            return int(leer(prompt).strip())
+            return leer_id(leer(prompt))
         except ValueError:
-            print("Escribe un numero.")
+            print("Escribe un numero entero positivo valido.")
 
 
 def pedir_fecha(prompt: str, leer=input, opcional: bool = False) -> datetime | None:
@@ -26,7 +27,7 @@ def pedir_fecha(prompt: str, leer=input, opcional: bool = False) -> datetime | N
         if not texto and opcional:
             return None
         try:
-            return datetime.strptime(texto, "%Y-%m-%d %H:%M")
+            return leer_fecha(texto)
         except ValueError:
             print("Formato: AAAA-MM-DD HH:MM")
 

@@ -71,7 +71,7 @@ class Reserva:
 
     def reembolso(self, ahora: datetime) -> int:
         """100% si aun no se asigna o hasta 1 hora antes del inicio, 50% hasta el inicio y 0% despues."""
-        if self.estado == "pendiente" or ahora <= self.periodo.inicio - timedelta(hours=1):
+        if self.estado == "pendiente" or self.periodo.inicio - ahora >= timedelta(hours=1):
             return self.monto
         if ahora < self.periodo.inicio:
             return self.monto // 2

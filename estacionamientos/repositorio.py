@@ -51,18 +51,17 @@ class Repositorio:
             (parking_id, fin, inicio)).fetchone()
         return reservas is not None or bloqueos is not None
 
-    def reservas_en_conflicto(self, parking_id: int, periodo: Periodo, estados: tuple[str, ...]) -> list[Reserva]:
+    def reservas_en_conflicto(self, parking_id: int, periodo: Periodo) -> list[Reserva]:
         inicio, fin = periodo.textos()
-        marcas = ",".join("?" * len(estados))
         filas = self.con.execute(
-            f"SELECT * FROM reservas WHERE parking_id=? AND estado IN ({marcas}) AND inicio < ? AND fin > ?",
-            (parking_id, *estados, fin, inicio))
+            f"SELECT * FROM reservas WHERE parking_id=? AND estado IN ({EN_ACTIVOS}) AND inicio < ? AND fin > ?",
+            (parking_id, fin, inicio))
         return [self._reserva(f) for f in filas]
 
     def reserva_que_cubre(self, parking_id: int, momento: datetime) -> Reserva | None:
         texto = momento.isoformat(timespec="minutes")
         fila = self.con.execute(
-            "SELECT * FROM reservas WHERE parking_id=? AND estado IN ('confirmada','en_curso')"
+            f"SELECT * FROM reservas WHERE parking_id=? AND estado IN ({EN_ACTIVOS})"
             " AND inicio <= ? AND fin > ?", (parking_id, texto, texto)).fetchone()
         return self._reserva(fila) if fila else None
 
@@ -76,6 +75,12 @@ class Repositorio:
     def guardar(self, reserva: Reserva) -> None:
         self.con.execute("UPDATE reservas SET parking_id=?, estado=? WHERE id=?",
                          (reserva.parking_id, reserva.estado, reserva.id))
+
+    def credito_por_reubicacion(self, reserva_id: int) -> int:
+        return self.con.execute(
+            "SELECT COALESCE(SUM(valor), 0) FROM historial WHERE reserva_id=? AND evento='vuelvo_ahora'",
+            (reserva_id,),
+        ).fetchone()[0]
 
     def acreditar(self, cliente_id: int, monto: int) -> None:
         self.con.execute("UPDATE clientes SET credito = credito + ? WHERE id=?", (monto, cliente_id))

@@ -20,6 +20,25 @@ python -m estacionamientos.web
 
 Los datos se guardan en `estacionamientos.db`, en la carpeta desde la que se ejecuta. Se crea sola con datos de prueba: propietarios 1 y 2, clientes 1 y 2, estacionamientos 1 y 2 normales y el 3 como comodin.
 
+## Como comprobar que los datos se guardan en SQLite
+
+1. Desde la carpeta del proyecto, ejecuta `python -m estacionamientos.web` y abre `http://localhost:8000`.
+2. Crea una reserva, anota su numero y comprueba que aparezca en **Reservas**. Abre **Historial (ultimos 50)** para ver el evento `creada`.
+3. Deten el servidor con **Ctrl+C**. Inicia la web de nuevo desde la **misma carpeta**. La reserva y su evento deben seguir visibles.
+4. Tambien puedes ejecutar `python main.py` desde esa carpeta y elegir **1 Cliente > 3 Ver estado** para ver los mismos datos en la consola.
+
+Cuando ejecutas el proyecto desde el ZIP, usa su carpeta `codigo/`. El archivo `estacionamientos.db` se guarda en la carpeta desde la que iniciaste el programa.
+
+### Consultar SQLite directamente
+
+Ejecuta este comando desde la carpeta que contiene `estacionamientos.db`. Abre la base en modo de solo lectura y muestra el numero de reserva, cliente, estacionamiento y estado:
+
+```bash
+python -c "import sqlite3; db=sqlite3.connect('file:estacionamientos.db?mode=ro', uri=True); print(db.execute('SELECT id, cliente_id, parking_id, estado FROM reservas ORDER BY id').fetchall()); db.close()"
+```
+
+En una reserva pendiente, el estacionamiento aparece como `None` porque todavia no tiene plaza asignada.
+
 ## Que hace cada rol
 
 | Rol | Funcionalidades |
