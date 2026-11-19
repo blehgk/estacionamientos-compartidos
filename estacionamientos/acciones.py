@@ -118,7 +118,7 @@ CONFIRMAR = {"cancelar": "Cancelar esta reserva"}
 VISTAS = [
     ("Reservas", "reservas", ["#", "Cliente", "Parking", "Inicio", "Fin", "Estado", "Monto"]),
     ("Estacionamientos", "estacionamientos", ["#", "Propietario", "Tipo", "Estado"]),
-    ("Historial (ultimos 50)", "historial", ["Hora", "Evento", "Reserva", "Parking", "Valor", "Detalle"]),
+    ("Historial (ultimos 50)", "historial", ["Hora", "Evento", "Reserva", "Parking", "Inicio", "Fin", "Valor", "Detalle"]),
 ]
 
 

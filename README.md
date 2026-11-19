@@ -4,30 +4,34 @@ Prototipo en Python para compartir estacionamientos de un edificio: el propietar
 
 Usa solo la libreria estandar de Python (3.10 o superior) y SQLite. No hay nada que instalar.
 
-## Uso
+## Iniciar las tres aplicaciones
 
-Version de terminal:
-
-```bash
-python main.py
-```
-
-Version web, abierta en `http://localhost:8000`:
+Desde la carpeta del proyecto (o `codigo/` dentro del ZIP), configura el acceso de Administrador una vez. El comando pide la clave sin mostrarla. El ID del administrador es **1**.
 
 ```bash
-python -m estacionamientos.web
+python -m estacionamientos.acceso
 ```
 
-Los datos se guardan en `estacionamientos.db`, en la carpeta desde la que se ejecuta. Se crea sola con datos de prueba: propietarios 1 y 2, clientes 1 y 2, estacionamientos 1 y 2 normales y el 3 como comodin.
+Ejecuta cada app en una terminal distinta, siempre desde **la misma carpeta**:
+
+| Aplicacion | Comando | Direccion local |
+| --- | --- | --- |
+| Usuario | `python -m estacionamientos.web usuario` | `http://localhost:8000` |
+| Propietario | `python -m estacionamientos.web propietario` | `http://localhost:8001` |
+| Administrador | `python -m estacionamientos.web administrador` | `http://localhost:8002` |
+
+Cada app tiene su propio inicio de sesion. Una cuenta de Usuario solo ve sus reservas y movimientos. Una cuenta de Propietario solo opera sus plazas. La terminal administrativa se abre con `python main.py` y pide la clave de Administrador.
+
+Las tres comparten `estacionamientos.db` en la carpeta de ejecucion. Si no existe, el programa la crea con dos clientes, dos propietarios, dos plazas normales y un comodin. Para entrar con las fichas existentes, emite sus claves desde Administrador. La base existente se conserva y recibe la tabla de accesos al iniciar una app.
+
+Para un ensayo local, agrega `--simulacion` a los comandos de las apps o a `python main.py`. Aparecera el campo de hora de operacion para avanzar el reloj de un caso. El modo normal usa el reloj del servidor.
 
 ## Como comprobar que los datos se guardan en SQLite
 
-1. Desde la carpeta del proyecto, ejecuta `python -m estacionamientos.web` y abre `http://localhost:8000`.
-2. Crea una reserva, anota su numero y comprueba que aparezca en **Reservas**. Abre **Historial (ultimos 50)** para ver el evento `creada`.
-3. Deten el servidor con **Ctrl+C**. Inicia la web de nuevo desde la **misma carpeta**. La reserva y su evento deben seguir visibles.
-4. Tambien puedes ejecutar `python main.py` desde esa carpeta y elegir **1 Cliente > 3 Ver estado** para ver los mismos datos en la consola.
-
-Cuando ejecutas el proyecto desde el ZIP, usa su carpeta `codigo/`. El archivo `estacionamientos.db` se guarda en la carpeta desde la que iniciaste el programa.
+1. Desde Administrador, crea un cliente y copia el ID y la clave que devuelve.
+2. Entra en Usuario con esos datos, solicita una reserva y anota su numero. En Administrador aparece la solicitud pendiente y se puede asignar.
+3. Deten los procesos con **Ctrl+C** y vuelve a iniciarlos desde la misma carpeta. Entra con las mismas credenciales y comprueba que sigan visibles la reserva y sus movimientos.
+4. Para revisar desde la terminal, ejecuta `python main.py`, ingresa como Administrador y elige **Ver estado**.
 
 ### Mostrar toda la base de datos
 
@@ -37,7 +41,7 @@ Desde la misma carpeta en la que ejecutas la app, usa:
 python -m estacionamientos.db
 ```
 
-Muestra la estructura y todos los registros en formato SQL, incluido el historial completo. Abre el archivo SQLite en modo de solo lectura. Si todavia no existe `estacionamientos.db`, inicia la app una vez para crearlo.
+Muestra la estructura y todos los registros en formato SQL, incluido el historial completo. Abre el archivo SQLite en modo de solo lectura. Inicia la app antes de consultarla por primera vez. El volcado contiene hashes de acceso y datos de los usuarios. Mantenlo como material de Administracion.
 
 ### Consultar SQLite directamente
 
@@ -51,23 +55,23 @@ En una reserva pendiente, el estacionamiento aparece como `None` porque todavia 
 
 ## Que hace cada rol
 
-| Rol | Funcionalidades |
-|---|---|
-| Propietario | Liberar y bloquear su estacionamiento. «Vuelvo ahora»: reubica al cliente en un comodin y le acredita el tiempo no usado. |
-| Cliente | Reservar, y cancelar con reembolso escalonado. |
-| Administrador | Asignar y reasignar reservas, registrar salidas y crear clientes y propietarios. |
+| Aplicacion | Flujo |
+| --- | --- |
+| Usuario | Consulta disponibilidad, solicita, sigue la confirmacion y revisa el monto antes de cancelar. Ve base, recargo, credito y total de sus reservas. |
+| Propietario | Ofrece sus plazas, bloquea por horario, retira una franja puntual y usa Vuelvo ahora para recuperar una plaza durante una reserva. |
+| Administrador | Crea clientes y propietarios, emite o restablece accesos, vincula plazas, asigna o reasigna, resuelve pendientes sin plaza y registra salidas. |
 
-### Registrar usuarios desde Administrador
+### Alta de un cliente o propietario
 
-En la terminal, ejecuta `python main.py`, elige **3 Administrador** y luego **4 Crear cliente** o **5 Crear propietario**. Escribe el nombre y anota el ID que muestra la aplicacion. En la version web, ambas opciones aparecen en la pestaña **Administrador**.
+En Administrador, elige **Crear cliente** o **Crear propietario**. En terminal, son las opciones **4** y **5** luego de ingresar. Copia el ID y la clave que se muestran una sola vez y entregalos al titular para que entre a su app. Si se pierde la clave, usa **Emitir o restablecer acceso**. La anterior y sus sesiones quedan invalidadas.
 
-SQLite asigna el ID automaticamente. El cliente puede usar su ID para reservar. El alta del propietario solo registra su ficha. Las plazas se administran por separado.
+Para un propietario, usa luego **Vincular nueva plaza** y selecciona su ficha. En su app aparecera la plaza como **sin oferta** hasta que el propietario la ofrezca. **Ofrecer plaza** conserva las franjas de bloqueo. **Retirar un bloqueo** elimina solamente el intervalo seleccionado.
 
 ## Reglas de negocio
 
 - El propietario tiene prioridad: al bloquear, las reservas afectadas se reubican a un comodin o, si no hay, se cancelan con reembolso total.
-- Un estacionamiento no puede tener dos reservas superpuestas. Una reserva puede empezar justo cuando termina otra.
-- Solo se reserva un estacionamiento liberado y sin bloqueos.
+- Un estacionamiento no admite dos reservas superpuestas. Se pueden programar turnos consecutivos. Al confirmar un turno que ya comienza, la salida de la ocupacion anterior debe quedar registrada.
+- Solo se reserva un estacionamiento ofrecido y sin bloqueos para la franja solicitada. Una solicitud pendiente requiere confirmacion de Administracion. La asignacion y reasignacion rechazan reservas vencidas.
 - Duracion de 1 a 2 horas, con anticipacion de 15 minutos a 7 dias. Tarifa de $30 por minuto.
 - Cancelacion: reembolso del 100% hasta 1 hora antes, 50% desde ahi hasta el inicio y 0% despues.
 - Sobreestadia: desde el minuto 6 de atraso, $60 por minuto.
@@ -80,9 +84,11 @@ SQLite asigna el ID automaticamente. El cliente puede usar su ID para reservar. 
 | `estacionamientos/repositorio.py` | Clase `Repositorio`: acceso a SQLite. |
 | `estacionamientos/servicios.py` | Clase `Sistema`: las funcionalidades de cada rol. No imprime ni lee datos. |
 | `estacionamientos/db.py` | Esquema SQLite, datos de prueba e historial de operaciones. |
-| `estacionamientos/acciones.py` | Acciones, formularios y vistas compartidos por la terminal y la web. |
-| `estacionamientos/consola.py` | Menus de terminal, generados desde `acciones.py`. |
-| `estacionamientos/web.py` | Interfaz web, generada desde `acciones.py`. |
+| `estacionamientos/paneles.py` | Operaciones y consultas limitadas a cada rol y cuenta. |
+| `estacionamientos/acceso.py` | Configuracion de Administrador, emision de accesos y verificacion de credenciales. |
+| `estacionamientos/acciones.py` | Validacion y formato reutilizados por la web, la terminal y el ensayo de negocio. |
+| `estacionamientos/consola.py` | Terminal autenticada de Administracion. |
+| `estacionamientos/web.py` | Tres aplicaciones web locales con sesiones separadas, formularios y paneles. |
 | `docs/documento_tecnico.md` | Modulos, funcionalidades, reglas de negocio y estructura de datos. |
 
 Cada operacion relevante queda en la tabla `historial` con estacionamiento, propietario, cliente, fecha, horas, estado y valor, lista para analizar en la siguiente entrega.
@@ -90,14 +96,12 @@ Cada operacion relevante queda en la tabla `historial` con estacionamiento, prop
 ## Decisiones de diseño
 
 - **Logica separada de la interfaz:** asi la terminal y la web comparten las mismas reglas.
-- **Una sola definicion de acciones:** la terminal y la web ofrecen lo mismo por construccion.
+- **Operaciones administrativas compartidas:** la terminal y la app de Administrador usan el mismo servicio y las mismas reglas.
 - **Tema claro y sobrio en la web:** es una herramienta de trabajo con tablas y formularios, y se pidio una presentacion profesional.
 - **Web accesible por teclado y lector de pantalla:** enlace para saltar al contenido, navegacion con nombre, formularios con nombre propio, titulo distinto por rol, foco automatico en el resultado de cada operacion y contraste mayor a 5:1. Sin scroll horizontal desde 320 px de ancho.
-- **Hora de la operacion opcional:** permite simular horas para probar cancelaciones y sobreestadias sin esperar.
+- **Modo de simulacion:** permite ensayar fechas, cancelaciones y sobreestadias con un reloj editable.
 
 ## Limitaciones
 
-- No hay inicio de sesion: el rol se elige desde la interfaz.
-- El propietario se valida por su numero, sin contraseña.
 - No incluye pagos reales ni el control de acceso por patente.
-- La interfaz web esta pensada para usarse en el propio equipo (escucha solo en `127.0.0.1`).
+- Las apps escuchan solo en `127.0.0.1`. Para uso remoto hacen falta un despliegue con HTTPS y un plan de operacion.

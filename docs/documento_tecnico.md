@@ -7,12 +7,14 @@
 | `estacionamientos/modelos.py` | Clases del dominio: `Periodo`, `Estacionamiento` y `Reserva`, y la excepcion `ReglaError`. Cada entidad aplica las reglas que dependen solo de sus datos (superposicion, reembolso escalonado, recargo por sobreestadia). |
 | `estacionamientos/repositorio.py` | Clase `Repositorio`: consulta y actualiza entidades del dominio en SQLite. |
 | `estacionamientos/servicios.py` | Clase `Sistema`: las 6 funcionalidades y las reglas que coordinan varias entidades (RN01 a RN05). No usa `input()` ni `print()`; las violaciones lanzan `ReglaError`. |
-| `estacionamientos/acciones.py` | Definicion unica de las acciones, formularios y vistas. La terminal y la web se generan desde aqui, por lo que ofrecen lo mismo y muestran los mismos mensajes y formatos. |
-| `estacionamientos/consola.py` | Menus de terminal generados desde `acciones.py`: pide los datos, confirma la cancelacion y muestra el estado (reservas, estacionamientos, historial y credito). |
-| `estacionamientos/web.py` | Front web opcional (servidor `http.server` de la libreria estandar). Se inicia con `python -m estacionamientos.web` y se abre en `http://localhost:8000`. |
+| `estacionamientos/acciones.py` | Validacion y formatos reutilizados por web, terminal y ensayo de negocio. |
+| `estacionamientos/consola.py` | Terminal autenticada de Administracion. |
+| `estacionamientos/web.py` | Tres apps locales autenticadas. Se inicia una por rol con `python -m estacionamientos.web usuario`, `propietario` o `administrador`. |
+| `estacionamientos/acceso.py` | Credenciales con sal y hash scrypt. |
+| `estacionamientos/paneles.py` | Autorizacion de operaciones y vistas segun rol y cuenta. |
 | `main.py` | Punto de entrada de la version de terminal. |
 
-**Clases utilizadas.** `Periodo` (intervalo semiabierto: `se_superpone`, `contiene`, `minutos`), `Estacionamiento` (`es_comodin`, `esta_liberado`), `Reserva` (`reembolso`, `recargo`, `esta_activa`), `Repositorio` (persistencia), `Sistema` (casos de uso del propietario, el cliente y el administrador), `ReglaError` (excepcion de dominio) y `Handler` (servidor web). Cada regla vive en la clase que tiene los datos, `Sistema` solo coordina y `Repositorio` aisla el SQL, por lo que las interfaces no conocen la base de datos. Cada operacion de `Sistema` recibe la hora (`ahora`), de modo que se prueba sin depender del reloj y la demostracion puede simular horas.
+**Clases utilizadas.** `Periodo` (intervalo semiabierto: `se_superpone`, `contiene`, `minutos`), `Estacionamiento` (`es_comodin`, `esta_liberado`), `Reserva` (`reembolso`, `recargo`, `esta_activa`), `Repositorio` (persistencia), `Sistema` (casos de uso del propietario, el cliente y el administrador), `ReglaError` (excepcion de dominio) y `Handler` (servidor web). Las reglas del dominio y el acceso a datos se encuentran en modulos separados, `Sistema` solo coordina y `Repositorio` aisla el SQL, por lo que las interfaces no conocen la base de datos. Cada operacion de `Sistema` recibe la hora (`ahora`), de modo que se prueba sin depender del reloj y la demostracion puede simular horas.
 
 ## 2. Funcionalidades
 | Usuario | Obligatoria | Propia |
@@ -24,7 +26,7 @@
 - **Reservar:** valida duracion, anticipacion y que exista un estacionamiento compatible; la reserva queda `pendiente`.
 - **Asignar:** el administrador confirma la reserva en un estacionamiento normal, liberado y sin conflicto.
 - **Reasignar:** mueve una reserva a otro estacionamiento (incluye comodines) tras verificar que no haya conflicto.
-- **Liberar:** deja el estacionamiento disponible y quita sus bloqueos vigentes. Solo lo puede usar su propietario.
+- **Ofrecer plaza:** habilita reservas y conserva los bloqueos. Retirar un bloqueo elimina la franja seleccionada. Solo lo puede usar su propietario.
 - **Bloquear:** solo el propietario del estacionamiento (nunca un comodin); crea un bloqueo; las reservas afectadas se reubican a un comodin libre o, si no hay, se cancelan con reembolso total.
 - **Vuelvo ahora:** bloquea desde el momento actual hasta el fin de la reserva, reubica al cliente y acredita el tiempo no utilizado. Los reembolsos descuentan el credito ya abonado por reubicacion.
 - **Registrar salida:** cierra una reserva activa desde su hora de inicio y calcula el recargo si supera la tolerancia.
@@ -46,6 +48,7 @@
 - `propietarios(id, nombre)`
 - `clientes(id, nombre, credito)`
 - `estacionamientos(id, propietario_id, tipo [normal|comodin], estado [liberado|bloqueado])`
+- `accesos(rol, usuario_id, sal, clave)`: credenciales separadas por rol con hash.
 - `bloqueos(id, parking_id, inicio, fin, motivo)`
 - `reservas(id, parking_id, cliente_id, inicio, fin, estado, monto)`; estados: `pendiente`, `confirmada`, `en_curso`, `cerrada`, `cancelada`, `reubicada`.
 - `historial(id, ts, evento, reserva_id, parking_id, propietario_id, cliente_id, inicio, fin, estado, valor, detalle)`: una fila por cada creacion, asignacion, reasignacion, bloqueo, liberacion, reubicacion, cancelacion, «vuelvo ahora» y cierre. Permite reconstruir estacionamiento, propietario, cliente, fecha, hora de inicio y termino, estado y valor para la Entrega 3.

@@ -8,8 +8,9 @@ EN_ACTIVOS = ",".join(repr(e) for e in ESTADOS_ACTIVOS)
 
 
 class Repositorio:
-    def __init__(self, con):
+    def __init__(self, con, autoconfirmar: bool = True):
         self.con = con
+        self.autoconfirmar = autoconfirmar
 
     @staticmethod
     def _reserva(fila) -> Reserva:
@@ -25,12 +26,39 @@ class Repositorio:
             "cliente": "INSERT INTO clientes (nombre) VALUES (?)",
             "propietario": "INSERT INTO propietarios (nombre) VALUES (?)",
         }
-        with self.con:
-            fila = self.con.execute(consultas[tipo], (nombre,))
+        fila = self.con.execute(consultas[tipo], (nombre,))
+        self.confirmar()
         return fila.lastrowid
 
     def existe_cliente(self, cliente_id: int) -> bool:
         return self.con.execute("SELECT 1 FROM clientes WHERE id=?", (cliente_id,)).fetchone() is not None
+
+    def crear_estacionamiento(self, propietario_id: int) -> int:
+        fila = self.con.execute(
+            "INSERT INTO estacionamientos (propietario_id, tipo, estado)"
+            " SELECT id, 'normal', 'bloqueado' FROM propietarios WHERE id=?", (propietario_id,))
+        if not fila.rowcount:
+            raise ReglaError("No existe ese propietario.")
+        return fila.lastrowid
+
+    def quitar_bloqueo(self, bloqueo_id: int, propietario_id: int, ahora: datetime):
+        fila = self.con.execute(
+            "SELECT b.* FROM bloqueos b JOIN estacionamientos e ON e.id=b.parking_id"
+            " WHERE b.id=? AND e.propietario_id=? AND b.fin>?",
+            (bloqueo_id, propietario_id, ahora.isoformat(timespec="minutes"))).fetchone()
+        if fila is None:
+            raise ReglaError("El bloqueo vigente no existe para tus plazas.")
+        self.con.execute("DELETE FROM bloqueos WHERE id=?", (bloqueo_id,))
+        return fila
+
+    def ultimo_movimiento(self, reserva_id: int) -> str | None:
+        return self.con.execute("SELECT MAX(ts) FROM historial WHERE reserva_id=?", (reserva_id,)).fetchone()[0]
+
+    def ocupacion_sin_cierre(self, parking_id: int, reserva_id: int, inicio: str) -> bool:
+        return self.con.execute(
+            f"SELECT 1 FROM reservas WHERE parking_id=? AND id<>? AND estado IN ({EN_ACTIVOS})"
+            " AND fin<=? LIMIT 1", (parking_id, reserva_id, inicio)
+        ).fetchone() is not None
 
     def estacionamiento(self, parking_id: int) -> Estacionamiento:
         fila = self.con.execute("SELECT * FROM estacionamientos WHERE id=?", (parking_id,)).fetchone()
@@ -42,6 +70,10 @@ class Repositorio:
         filtro = " AND estado='liberado'" if solo_liberados else ""
         filas = self.con.execute(f"SELECT * FROM estacionamientos WHERE tipo=?{filtro} ORDER BY id", (tipo,))
         return [self._estacionamiento(f) for f in filas]
+
+    def reserva_del_cliente(self, reserva_id: int, cliente_id: int) -> bool:
+        return self.con.execute("SELECT 1 FROM reservas WHERE id=? AND cliente_id=?",
+                                (reserva_id, cliente_id)).fetchone() is not None
 
     def reserva(self, reserva_id: int) -> Reserva:
         fila = self.con.execute("SELECT * FROM reservas WHERE id=?", (reserva_id,)).fetchone()
@@ -107,7 +139,8 @@ class Repositorio:
         self.con.execute("UPDATE estacionamientos SET estado='liberado' WHERE id=?", (parking_id,))
 
     def registrar(self, evento: str, ahora: datetime, **datos) -> None:
-        registrar(self.con, evento, ahora, **datos)
+        registrar(self.con, evento, ahora, confirmar=self.autoconfirmar, **datos)
 
     def confirmar(self) -> None:
-        self.con.commit()
+        if self.autoconfirmar:
+            self.con.commit()

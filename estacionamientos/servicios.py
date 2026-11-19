@@ -14,8 +14,8 @@ __all__ = ["Sistema", "ReglaError"]
 class Sistema:
     """Operaciones del propietario, el cliente y el administrador sobre una base de datos."""
 
-    def __init__(self, con):
-        self.repo = Repositorio(con)
+    def __init__(self, con, autoconfirmar: bool = True):
+        self.repo = Repositorio(con, autoconfirmar)
 
     # consultas de disponibilidad
 
@@ -60,6 +60,21 @@ class Sistema:
         self.repo.registrar(evento, ahora, reserva_id=reserva.id, cliente_id=reserva.cliente_id,
                             inicio=inicio, fin=fin, **datos)
 
+    def _validar_secuencia(self, reserva: Reserva, ahora: datetime) -> None:
+        ultimo = self.repo.ultimo_movimiento(reserva.id)
+        if ultimo and ahora < datetime.fromisoformat(ultimo).replace(tzinfo=None):
+            raise ReglaError("La hora es anterior al ultimo movimiento de la reserva.")
+
+    def _validar_asignacion(self, reserva: Reserva, plaza: int, ahora: datetime) -> None:
+        self._validar_secuencia(reserva, ahora)
+        if ahora >= reserva.periodo.fin:
+            raise ReglaError("La reserva ya vencio.")
+
+        if ahora >= reserva.periodo.inicio and self.repo.ocupacion_sin_cierre(
+            plaza, reserva.id, reserva.periodo.inicio.isoformat(timespec="minutes")
+        ):
+            raise ReglaError("La plaza tiene una reserva anterior sin salida registrada.")
+
     def _credito_pendiente(self, reserva: Reserva, monto: int) -> int:
         return max(0, monto - self.repo.credito_por_reubicacion(reserva.id))
 
@@ -83,15 +98,19 @@ class Sistema:
                         valor=monto)
         return reserva_id
 
-    def cancelar(self, reserva_id: int, ahora: datetime) -> int:
+    def calcular_cancelacion(self, reserva: Reserva, ahora: datetime) -> int:
+        if reserva.estado not in ("pendiente", "confirmada", "reubicada"):
+            raise ReglaError(f"No se puede cancelar una reserva {reserva.estado}.")
+        self._validar_secuencia(reserva, ahora)
+        return self._credito_pendiente(reserva, reserva.reembolso(ahora))
+
+    def cancelar(self, reserva_id: int, ahora: datetime, detalle: str = "") -> int:
         r = self.repo.reserva(reserva_id)
-        if r.estado not in ("pendiente", "confirmada", "reubicada"):
-            raise ReglaError(f"No se puede cancelar una reserva {r.estado}.")
-        devuelto = self._credito_pendiente(r, r.reembolso(ahora))
+        devuelto = self.calcular_cancelacion(r, ahora)
         r.estado = "cancelada"
         self.repo.guardar(r)
         self.repo.acreditar(r.cliente_id, devuelto)
-        self._registrar("cancelada", ahora, r, valor=devuelto)
+        self._registrar("cancelada", ahora, r, valor=devuelto, detalle=detalle)
         return devuelto
 
     # propietario
@@ -103,6 +122,15 @@ class Sistema:
         self.repo.marcar_liberado(parking_id)
         self.repo.registrar("liberado", ahora, parking_id=parking_id, estado="liberado")
 
+    def publicar(self, parking_id: int, propietario_id: int, ahora: datetime) -> None:
+        self._propio(parking_id, propietario_id)
+        self.repo.marcar_liberado(parking_id)
+        self.repo.registrar("liberado", ahora, parking_id=parking_id, estado="liberado")
+
+    def quitar_bloqueo(self, bloqueo_id: int, propietario_id: int, ahora: datetime) -> None:
+        b = self.repo.quitar_bloqueo(bloqueo_id, propietario_id, ahora)
+        self.repo.registrar("bloqueo_retirado", ahora, parking_id=b["parking_id"], inicio=b["inicio"], fin=b["fin"])
+
     def bloquear(self, parking_id: int, inicio: datetime, fin: datetime, motivo: str,
                  ahora: datetime, propietario_id: int | None = None) -> list[int]:
         """El propietario tiene prioridad: reubica las reservas afectadas o las cancela con reembolso total."""
@@ -111,6 +139,8 @@ class Sistema:
             raise ReglaError("El termino debe ser posterior al inicio.")
         periodo = Periodo(inicio, fin)
         afectadas = self.repo.reservas_en_conflicto(parking_id, periodo)
+        for reserva in afectadas:
+            self._validar_secuencia(reserva, ahora)
         self.repo.agregar_bloqueo(parking_id, periodo, motivo)
         ini, fi = periodo.textos()
         self.repo.registrar("bloqueado", ahora, parking_id=parking_id, inicio=ini, fin=fi,
@@ -134,7 +164,7 @@ class Sistema:
         self._propio(parking_id, propietario_id)
         r = self.repo.reserva_que_cubre(parking_id, ahora)
         if r is None:
-            raise ReglaError("No hay una reserva en curso en ese estacionamiento.")
+            raise ReglaError("No hay una reserva en curso en ese estacionamiento. Usa Bloquear para impedir reservas.")
         self.bloquear(parking_id, ahora, r.periodo.fin, "vuelvo ahora", ahora, propietario_id)
         r = self.repo.reserva(r.id)
         if r.estado == "cancelada":  # sin comodin: bloquear ya abono el saldo
@@ -152,11 +182,16 @@ class Sistema:
             raise ReglaError("Escribe un nombre valido.")
         return self.repo.crear_usuario(tipo, nombre)
 
+    def crear_estacionamiento(self, propietario_id: int, ahora: datetime) -> int:
+        plaza = self.repo.crear_estacionamiento(propietario_id)
+        self.repo.registrar("plaza_creada", ahora, parking_id=plaza, estado="bloqueado")
+        return plaza
 
     def asignar(self, reserva_id: int, parking_id: int, ahora: datetime) -> None:
         r = self.repo.reserva(reserva_id)
         if r.estado != "pendiente":
             raise ReglaError(f"Solo se asignan reservas pendientes (esta esta {r.estado}).")
+        self._validar_asignacion(r, parking_id, ahora)
         self._apto(parking_id, r, permitir_comodin=False)
         r.parking_id, r.estado = parking_id, "confirmada"
         self.repo.guardar(r)
@@ -168,6 +203,7 @@ class Sistema:
             raise ReglaError(f"No se puede reasignar una reserva {r.estado}.")
         if nuevo_parking_id == r.parking_id:
             raise ReglaError("La reserva ya esta en ese estacionamiento.")
+        self._validar_asignacion(r, nuevo_parking_id, ahora)
         self._apto(nuevo_parking_id, r, permitir_comodin=True)
         origen = r.parking_id
         r.parking_id = nuevo_parking_id
@@ -180,6 +216,7 @@ class Sistema:
             raise ReglaError(f"No se puede cerrar una reserva {r.estado}.")
         if ahora < r.periodo.inicio:
             raise ReglaError("No se puede registrar la salida antes del inicio de la reserva.")
+        self._validar_secuencia(r, ahora)
         recargo = r.recargo(ahora)
         r.estado = "cerrada"
         self.repo.guardar(r)
